@@ -1,0 +1,7 @@
+{
+  "prefix": "timIsCool",
+  "paths": {
+    "timIsCool": "."
+  },
+  "translations": ["translations/ja-JP.json"]
+}
