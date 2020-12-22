@@ -3,11 +3,11 @@ const INDEX_PREFIX = 'tests-';
 import { getSettings } from './get_settings';
 import { getData } from './get_data';
 
-const data1 = getData();
-const data2 = getData();
-const data3 = getData();
-
 export const createRandomBulkMetricData = (): string => {
+  const data1 = getData();
+  const data2 = getData();
+  const data3 = getData();
+
   const returnLines: string[] = [];
   returnLines.push(`DELETE /${INDEX_PREFIX}*`);
   returnLines.push('\n');

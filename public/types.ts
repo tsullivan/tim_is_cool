@@ -1,3 +1,4 @@
+import { DataPublicPluginStart } from '../../../src/plugins/data/public';
 import { NavigationPublicPluginStart } from '../../../src/plugins/navigation/public';
 
 export interface TimIsCoolPluginSetup {
@@ -8,4 +9,5 @@ export interface TimIsCoolPluginStart {}
 
 export interface AppPluginStartDependencies {
   navigation: NavigationPublicPluginStart;
+  data: DataPublicPluginStart;
 }

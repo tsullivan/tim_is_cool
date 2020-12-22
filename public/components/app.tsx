@@ -1,95 +1,85 @@
 import {
-  EuiButton,
-  EuiCodeEditor,
-  EuiFlexGroup,
-  EuiFlexItem,
   EuiPage,
   EuiPageBody,
   EuiPageContent,
   EuiPageContentBody,
-
   EuiPageHeader,
-
-  EuiText, EuiTitle
+  EuiSpacer,
+  EuiTab,
+  EuiTabs,
+  EuiTitle,
 } from '@elastic/eui';
-import { FormattedMessage, I18nProvider } from '@kbn/i18n/react';
+import { I18nProvider } from '@kbn/i18n/react';
 import React, { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { CoreStart } from '../../../../src/core/public';
-import { NavigationPublicPluginStart } from '../../../../src/plugins/navigation/public';
-import { PLUGIN_ID, PLUGIN_NAME } from '../../common';
+import { PLUGIN_ID } from '../../common';
+import { AppPluginStartDependencies } from '../types';
+import { RandomData } from './random_data';
+import { SearchData } from './search';
 
-
-
-
-interface TimIsCoolAppDeps {
+export interface TimIsCoolAppDeps {
   basename: string;
   notifications: CoreStart['notifications'];
   http: CoreStart['http'];
-  navigation: NavigationPublicPluginStart;
+  plugins: AppPluginStartDependencies;
+  initialData: string;
 }
+const tabs = [
+  {
+    id: 'tests',
+    name: 'Tests',
+  },
+  {
+    id: 'random_data',
+    name: 'Random Data',
+  },
+];
 
-export const TimIsCoolApp = ({ basename, notifications, http, navigation }: TimIsCoolAppDeps) => {
+export const TimIsCoolApp = (props: TimIsCoolAppDeps) => {
   // Use React hooks to manage state.
-  const [randomData, setRandomData] = useState<string | undefined>();
+  const [selectedTabId, setSelectedTabId] = useState('tests');
 
-  const onClickHandler = () => {
-    // Use the core http service to make a response to the server API.
-    http.get('/api/tim_is_cool/random').then((res) => {
-      setRandomData(res.data);
-    });
+  const onSelectedTabChanged = (id: string) => {
+    setSelectedTabId(id);
+  };
+
+  const renderTabs = () => {
+    return tabs.map((tab, index) => (
+      <EuiTab
+        onClick={() => onSelectedTabChanged(tab.id)}
+        isSelected={tab.id === selectedTabId}
+        key={index}
+      >
+        {tab.name}
+      </EuiTab>
+    ));
+  };
+
+  const renderContent = () => {
+    return selectedTabId === 'random_data' ? <RandomData {...props} /> : <SearchData {...props} />;
   };
 
   // Render the application DOM.
   // Note that `navigation.ui.TopNavMenu` is a stateful component exported on the `navigation` plugin's start contract.
+  const { TopNavMenu } = props.plugins.navigation.ui;
   return (
-    <Router basename={basename}>
+    <Router basename={props.basename}>
       <I18nProvider>
         <>
-          <navigation.ui.TopNavMenu
-            appName={PLUGIN_ID}
-            showSearchBar={true}
-            useDefaultBehaviors={true}
-          />
+          <TopNavMenu appName={PLUGIN_ID} showSearchBar={true} useDefaultBehaviors={true} />
           <EuiPage restrictWidth="1000px">
             <EuiPageBody>
               <EuiPageHeader>
                 <EuiTitle size="l">
-                  <h1>
-                    <FormattedMessage
-                      id="timIsCool.helloWorldText"
-                      defaultMessage="{name}"
-                      values={{ name: PLUGIN_NAME }}
-                    />
-                  </h1>
+                  <h1>Tim is Cool</h1>
                 </EuiTitle>
               </EuiPageHeader>
               <EuiPageContent>
                 <EuiPageContentBody>
-                  <EuiText>
-<EuiFlexGroup>
-  <EuiFlexItem>
-<EuiCodeEditor
-      mode="json"
-      isReadOnly={true}
-      theme="github"
-      width="100%"
-      value={randomData}
-      onBlur={() => {}}
-      aria-label="Code Editor"
-    />
-
-  </EuiFlexItem>
-</EuiFlexGroup>
-<EuiFlexGroup>
-  <EuiFlexItem>
-                    <EuiButton type="primary" size="s" onClick={onClickHandler}>
-                      <FormattedMessage id="timIsCool.buttonText" defaultMessage="Get data" />
-                    </EuiButton>
-
-  </EuiFlexItem>
-</EuiFlexGroup>
-                  </EuiText>
+                  <EuiTabs>{renderTabs()}</EuiTabs>
+                  <EuiSpacer />
+                  {renderContent()}
                 </EuiPageContentBody>
               </EuiPageContent>
             </EuiPageBody>

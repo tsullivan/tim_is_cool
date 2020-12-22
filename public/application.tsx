@@ -6,18 +6,21 @@ import { TimIsCoolApp } from './components/app';
 
 export const renderApp = (
   { notifications, http }: CoreStart,
-  { navigation }: AppPluginStartDependencies,
+  plugins: AppPluginStartDependencies,
   { appBasePath, element }: AppMountParameters
 ) => {
-  ReactDOM.render(
-    <TimIsCoolApp
-      basename={appBasePath}
-      notifications={notifications}
-      http={http}
-      navigation={navigation}
-    />,
-    element
-  );
+  http.get('/api/tim_is_cool/random').then((res) => {
+    ReactDOM.render(
+      <TimIsCoolApp
+        basename={appBasePath}
+        notifications={notifications}
+        http={http}
+        plugins={plugins}
+        initialData={res.data}
+      />,
+      element
+    );
+  });
 
   return () => ReactDOM.unmountComponentAtNode(element);
 };
