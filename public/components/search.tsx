@@ -1,8 +1,10 @@
 import { EuiButton, EuiFlexGroup, EuiFlexItem, EuiTextArea } from '@elastic/eui';
 import React, { useEffect, useState } from 'react';
-import useObservable from 'react-use/lib/useObservable';
-import * as Rx from 'rxjs';
-import type { IEsSearchResponse, IndexPattern } from 'src/plugins/data/public';
+import {
+  IndexPattern,
+  isCompleteResponse,
+  isErrorResponse,
+} from '../../../../src/plugins/data/public';
 import { ENHANCED_ES_SEARCH_STRATEGY } from '../../../../x-pack/plugins/data_enhanced/public';
 import type { TimIsCoolAppDeps } from './app';
 
@@ -11,9 +13,8 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
 
   const [req, setReq] = useState<{ params: any }>();
   const [indexPattern, setIndexPattern] = useState<IndexPattern>();
-
-  const searchSubscription$ = new Rx.Subject<IEsSearchResponse>();
-  const myCoolData = useObservable<IEsSearchResponse>(searchSubscription$);
+  const [response, setResponse] = useState<Record<string, any>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // auto
   useEffect(() => {
@@ -31,7 +32,11 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
           console.info('got pattern', pattern);
 
           // Constuct the agg portion of the search request
-          const aggs = [{ type: 'avg', params: { field: 'avocadoes' } }];
+          const aggs = [
+            { type: 'shard_delay', params: { value: '2s' } },
+            { type: 'terms', params: { field: 'country', order: 'desc', size: 5 } },
+            { type: 'avg', params: { field: 'avocadoes' } },
+          ];
           const aggsDsl = data.search.aggs.createAggConfigs(pattern, aggs).toDsl();
 
           const myReq = { params: { index: pattern.title, size: 1500, body: { aggs: aggsDsl } } }; // Search Request
@@ -47,18 +52,30 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
       return;
     }
 
+    setIsLoading(true);
+
     // Submit the search request using the `data.search` service.
-    data.search
+    const search$ = data.search
       .search(req, {
         strategy: ENHANCED_ES_SEARCH_STRATEGY,
       })
       .subscribe({
         next: (res) => {
-          searchSubscription$.next(res);
+          if (isCompleteResponse(res)) {
+            setResponse(res.rawResponse);
+            setIsLoading(false);
+            console.info('got response', res.rawResponse);
+            search$.unsubscribe();
+          } else if (isErrorResponse(res)) {
+            setIsLoading(false);
+            notifications.toasts.addError(new Error('Error response'), { title: 'Error' });
+            search$.unsubscribe();
+          }
         },
         error: (err) => {
+          setIsLoading(false);
           console.error(err);
-          notifications.toasts.addDanger('Failed to run search');
+          notifications.toasts.addError(err, { title: 'Failed to run search' });
         },
       });
   };
@@ -75,19 +92,15 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
         </EuiFlexItem>
         <EuiFlexItem grow={true}>
           <EuiTextArea
-            defaultValue={JSON.stringify(myCoolData?.rawResponse.aggregations)}
+            defaultValue={JSON.stringify(response?.aggregations)}
             readOnly={true}
             aria-label="Search Shower"
           />
         </EuiFlexItem>
       </EuiFlexGroup>
-      <EuiFlexGroup>
-        <EuiFlexItem grow={true}>
-          <EuiButton type="primary" size="s" onClick={() => doAsyncSearch()}>
-            Send search
-          </EuiButton>
-        </EuiFlexItem>
-      </EuiFlexGroup>
+      <EuiButton type="primary" size="s" onClick={() => doAsyncSearch()} isLoading={isLoading}>
+        Send search
+      </EuiButton>
     </>
   );
 };
