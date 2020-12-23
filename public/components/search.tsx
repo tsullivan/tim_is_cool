@@ -4,7 +4,7 @@ import useObservable from 'react-use/lib/useObservable';
 import * as Rx from 'rxjs';
 import type { IEsSearchResponse, IndexPattern } from 'src/plugins/data/public';
 import { ENHANCED_ES_SEARCH_STRATEGY } from '../../../../x-pack/plugins/data_enhanced/public';
-import { TimIsCoolAppDeps } from './app';
+import type { TimIsCoolAppDeps } from './app';
 
 export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
   const { data } = plugins;
@@ -15,10 +15,10 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
   const searchSubscription$ = new Rx.Subject<IEsSearchResponse>();
   const myCoolData = useObservable<IEsSearchResponse>(searchSubscription$);
 
-  const { indexPatterns, query: queries } = data;
+  // auto
   useEffect(() => {
     if (!indexPattern) {
-      indexPatterns
+      data.indexPatterns
         .create({
           title: 'tests-*',
           fields: {
@@ -27,17 +27,22 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
           },
         })
         .then((pattern) => {
-          // Constuct the query portion of the search request
-          const query = queries.getEsQuery(pattern);
-          setReq({ params: { index: pattern.title, size: 1500, body: { query } } });
           setIndexPattern(pattern);
+          console.info('got pattern', pattern);
+
+          // Constuct the agg portion of the search request
+          const aggs = [{ type: 'avg', params: { field: 'avocadoes' } }];
+          const aggsDsl = data.search.aggs.createAggConfigs(pattern, aggs).toDsl();
+
+          const myReq = { params: { index: pattern.title, size: 1500, body: { aggs: aggsDsl } } }; // Search Request
+          setReq(myReq);
+          console.info('got req', myReq);
         });
     }
-  }, [indexPattern, req, indexPatterns, queries]);
+  }, [indexPattern, req, data.indexPatterns, data.search.aggs]);
 
+  // onClick
   const doAsyncSearch = async () => {
-    const controllerOfAborting = new AbortController();
-
     if (!req) {
       return;
     }
@@ -46,7 +51,6 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
     data.search
       .search(req, {
         strategy: ENHANCED_ES_SEARCH_STRATEGY,
-        abortSignal: controllerOfAborting.signal,
       })
       .subscribe({
         next: (res) => {
@@ -57,10 +61,6 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
           notifications.toasts.addDanger('Failed to run search');
         },
       });
-
-    setTimeout(() => {
-      controllerOfAborting.abort();
-    }, 1800);
   };
 
   return (
@@ -75,7 +75,7 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
         </EuiFlexItem>
         <EuiFlexItem grow={true}>
           <EuiTextArea
-            defaultValue={myCoolData ? JSON.stringify(myCoolData.rawResponse) : ''}
+            defaultValue={JSON.stringify(myCoolData?.rawResponse.aggregations)}
             readOnly={true}
             aria-label="Search Shower"
           />
