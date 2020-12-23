@@ -16,6 +16,8 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
   const [response, setResponse] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  const [abortController, setAbortController] = useState<AbortController>();
+
   // auto
   useEffect(() => {
     if (!indexPattern) {
@@ -46,11 +48,14 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
     }
   }, [indexPattern, req, data.indexPatterns, data.search.aggs]);
 
-  // onClick
-  const doAsyncSearch = async () => {
+  // handle click action to search
+  const doDelayedAsyncSearch = async () => {
     if (!req) {
       return;
     }
+
+    const controller = new AbortController();
+    setAbortController(controller);
 
     setIsLoading(true);
 
@@ -58,6 +63,7 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
     const search$ = data.search
       .search(req, {
         strategy: ENHANCED_ES_SEARCH_STRATEGY,
+        abortSignal: controller.signal,
       })
       .subscribe({
         next: (res) => {
@@ -71,6 +77,10 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
             notifications.toasts.addError(new Error('Error response'), { title: 'Error' });
             search$.unsubscribe();
           }
+
+          if (res.isRunning) {
+            notifications.toasts.addInfo('Search is still running...');
+          }
         },
         error: (err) => {
           setIsLoading(false);
@@ -78,6 +88,15 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
           notifications.toasts.addError(err, { title: 'Failed to run search' });
         },
       });
+  };
+
+  // cancel
+  const doCancel = () => {
+    if (!abortController) {
+      throw new Error('bad abort controller initialization');
+    }
+
+    abortController.abort();
   };
 
   return (
@@ -98,9 +117,24 @@ export const SearchData = ({ notifications, plugins }: TimIsCoolAppDeps) => {
           />
         </EuiFlexItem>
       </EuiFlexGroup>
-      <EuiButton type="primary" size="s" onClick={() => doAsyncSearch()} isLoading={isLoading}>
-        Send search
-      </EuiButton>
+
+      <EuiFlexGroup>
+        <EuiFlexItem grow={false}>
+          <EuiButton
+            type="primary"
+            size="s"
+            onClick={() => doDelayedAsyncSearch()}
+            isLoading={isLoading}
+          >
+            Search
+          </EuiButton>
+        </EuiFlexItem>
+        <EuiFlexItem grow={false}>
+          <EuiButton type="primary" size="s" onClick={() => doCancel()} isDisabled={!isLoading}>
+            Cancel
+          </EuiButton>
+        </EuiFlexItem>
+      </EuiFlexGroup>
     </>
   );
 };
